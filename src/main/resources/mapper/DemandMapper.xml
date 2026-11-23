@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.leapmotor.energy.portal.server.demand.mapper.DemandMapper">
+    <insert id="ensureSequence">
+        INSERT INTO portal_demand_sequence (business_date, last_number)
+        VALUES (#{date}, 0)
+        ON DUPLICATE KEY UPDATE last_number = last_number
+    </insert>
+
+    <update id="incrementSequence">
+        UPDATE portal_demand_sequence
+        SET last_number = last_number + 1
+        WHERE business_date = #{date} AND last_number &lt; 9999
+    </update>
+
+    <select id="currentSequence" resultType="int">
+        SELECT last_number FROM portal_demand_sequence WHERE business_date = #{date} FOR UPDATE
+    </select>
+
+    <insert id="insert">
+        INSERT INTO portal_demand
+            (id, number, name, category, description, applicant_id, status, create_time, update_time, form_json)
+        VALUES
+            (#{request.id}, #{request.number}, #{request.name}, #{request.category}, #{request.description},
+             #{request.applicantId}, #{request.status}, #{request.createTime}, #{request.updateTime},
+             #{request.formJson})
+    </insert>
+
+    <sql id="listColumns">
+        id, number, name, category, description, applicant_id AS applicantId, status, create_time AS createTime
+    </sql>
+
+    <sql id="detailColumns">
+        <include refid="listColumns"/>, update_time AS updateTime, form_json AS formJson
+    </sql>
+
+    <select id="find" resultType="com.leapmotor.energy.portal.server.demand.dto.DemandModels$Request">
+        SELECT <include refid="detailColumns"/>
+        FROM portal_demand WHERE id = #{id}
+    </select>
+
+    <select id="lock" resultType="com.leapmotor.energy.portal.server.demand.dto.DemandModels$Request"
+            useCache="false" flushCache="true">
+        SELECT <include refid="detailColumns"/>
+        FROM portal_demand WHERE id = #{id} FOR UPDATE
+    </select>
+
+    <update id="updateStatus">
+        UPDATE portal_demand SET status = #{status}, update_time = #{updateTime} WHERE id = #{id}
+    </update>
+
+    <update id="updateApplication">
+        UPDATE portal_demand
+        SET name = #{request.name}, category = #{request.category}, description = #{request.description},
+            status = #{request.status}, update_time = #{request.updateTime}, form_json = #{request.formJson}
+        WHERE id = #{request.id}
+    </update>
+
+    <insert id="insertLog">
+        INSERT INTO portal_demand_log
+            (demand_id, operation_time, operator_id, previous_status, action, opinion, next_status,
+             next_operator_id, stage_seconds)
+        VALUES
+            (#{id}, #{log.operationTime}, #{log.operatorId}, #{log.previousStatus,jdbcType=VARCHAR},
+             #{log.action}, #{log.opinion,jdbcType=VARCHAR}, #{log.nextStatus},
+             #{log.nextOperatorId,jdbcType=VARCHAR}, #{log.stageSeconds,jdbcType=BIGINT})
+    </insert>
+
+    <select id="logs" resultType="com.leapmotor.energy.portal.server.demand.dto.DemandModels$Log">
+        SELECT operation_time AS operationTime, operator_id AS operatorId, previous_status AS previousStatus,
+               action, opinion, next_status AS nextStatus, next_operator_id AS nextOperatorId,
+               stage_seconds AS stageSeconds
+        FROM portal_demand_log
+        WHERE demand_id = #{id}
+        ORDER BY operation_time DESC, id DESC
+    </select>
+
+    <sql id="filters">
+        <where>
+            <if test="applicantId != null">AND applicant_id = #{applicantId}</if>
+            <if test="query.name != null and query.name != ''">
+                AND LOCATE(#{query.name}, name) &gt; 0
+            </if>
+            <if test="query.number != null and query.number != ''">
+                AND LOCATE(#{query.number}, number) &gt; 0
+            </if>
+            <if test="query.category != null">AND category = #{query.category}</if>
+            <if test="query.status != null">AND status = #{query.status}</if>
+        </where>
+    </sql>
+
+    <select id="page" resultType="com.leapmotor.energy.portal.server.demand.dto.DemandModels$ListItem">
+        SELECT <include refid="listColumns"/>
+        FROM portal_demand
+        <include refid="filters"/>
+        ORDER BY create_time DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*) FROM portal_demand
+        <include refid="filters"/>
+    </select>
+</mapper>
+
