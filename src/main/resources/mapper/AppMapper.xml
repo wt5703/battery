@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.leapmotor.energy.portal.server.app.mapper.AppMapper">
+    <sql id="baseColumns">
+        id, name, code, context_path AS contextPath, index_path AS indexPath,
+        domain, ip, port, create_time AS createTime
+    </sql>
+
+    <sql id="managementColumns">
+        <include refid="baseColumns"/>,
+        business_bp AS businessBp, description, icon, business_scene AS businessScene,
+        capability_tag AS capabilityTag, source, updated_by AS updatedBy, update_time AS updateTime
+    </sql>
+
+    <sql id="filters">
+        <where>
+            <if test="name != null and name != ''">AND LOCATE(#{name}, name) &gt; 0</if>
+            <if test="businessScene != null and businessScene != ''">AND business_scene = #{businessScene}</if>
+            <if test="updatedBy != null and updatedBy != ''">AND updated_by = #{updatedBy}</if>
+        </where>
+    </sql>
+
+    <select id="page" resultType="com.leapmotor.energy.portal.server.app.dto.AppManagementVo">
+        SELECT <include refid="managementColumns"/>
+        FROM portal_app
+        <include refid="filters"/>
+        ORDER BY create_time DESC, id DESC
+        <if test="pagination">
+            LIMIT #{offset}, #{pageSize}
+        </if>
+    </select>
+
+    <select id="count" resultType="int">
+        SELECT COUNT(1)
+        FROM portal_app
+        <include refid="filters"/>
+    </select>
+
+    <select id="queryAllApps" resultType="com.leapmotor.energy.common.dto.AppVo">
+        SELECT <include refid="baseColumns"/>
+        FROM portal_app
+        ORDER BY name
+    </select>
+
+    <select id="queryAppById" resultType="com.leapmotor.energy.common.dto.AppVo">
+        SELECT <include refid="baseColumns"/>
+        FROM portal_app
+        WHERE id = #{appId}
+    </select>
+
+    <select id="queryAppByCode" resultType="com.leapmotor.energy.common.dto.AppVo">
+        SELECT <include refid="baseColumns"/>
+        FROM portal_app
+        WHERE code = #{code}
+    </select>
+
+    <select id="queryManagementApp" resultType="com.leapmotor.energy.portal.server.app.dto.AppManagementVo">
+        SELECT <include refid="managementColumns"/>
+        FROM portal_app
+        WHERE id = #{appId}
+    </select>
+
+    <select id="lockAppWrites" resultType="int" useCache="false" flushCache="true">
+        SELECT id FROM portal_app_write_lock WHERE id = 1 FOR UPDATE
+    </select>
+
+    <select id="queryPrefixesForUpdate" resultType="com.leapmotor.energy.common.dto.AppVo"
+            useCache="false" flushCache="true">
+        SELECT id, context_path AS contextPath FROM portal_app FOR UPDATE
+    </select>
+
+    <insert id="addApp">
+        INSERT INTO portal_app (
+            id, name, code, context_path, index_path, domain, ip, port, business_bp, description,
+            icon, business_scene, capability_tag, source, updated_by, update_time
+        )
+        VALUES (
+            #{appId}, #{dto.name}, #{dto.code}, #{dto.contextPath,jdbcType=VARCHAR},
+            #{dto.indexPath,jdbcType=VARCHAR}, #{dto.domain,jdbcType=VARCHAR},
+            #{dto.ip,jdbcType=VARCHAR}, #{dto.port,jdbcType=VARCHAR}, #{dto.businessBp},
+            #{dto.description}, #{dto.icon}, #{dto.businessScene}, #{dto.capabilityTag},
+            #{dto.source}, #{updatedBy}, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <update id="updateApp">
+        UPDATE portal_app
+        <set>
+            <if test="dto.name != null and !dto.name.isBlank()">name = #{dto.name},</if>
+            <if test="dto.code != null and !dto.code.isBlank()">code = #{dto.code},</if>
+            <if test="dto.contextPath != null and !dto.contextPath.isBlank()">context_path = #{dto.contextPath},</if>
+            <if test="dto.indexPath != null and !dto.indexPath.isBlank()">index_path = #{dto.indexPath},</if>
+            <if test="dto.domain != null">domain = #{dto.domain},</if>
+            <if test="dto.ip != null">ip = #{dto.ip},</if>
+            <if test="dto.port != null">port = #{dto.port},</if>
+            <if test="dto.businessBp != null and !dto.businessBp.isBlank()">business_bp = #{dto.businessBp},</if>
+            <if test="dto.description != null and !dto.description.isBlank()">description = #{dto.description},</if>
+            <if test="dto.icon != null and !dto.icon.isBlank()">icon = #{dto.icon},</if>
+            <if test="dto.businessScene != null and !dto.businessScene.isBlank()">business_scene = #{dto.businessScene},</if>
+            <if test="dto.capabilityTag != null and !dto.capabilityTag.isBlank()">capability_tag = #{dto.capabilityTag},</if>
+            <if test="dto.source != null">source = #{dto.source},</if>
+            updated_by = #{updatedBy},
+            update_time = CURRENT_TIMESTAMP
+        </set>
+        WHERE id = #{appId}
+    </update>
+
+    <delete id="deleteApp">
+        DELETE FROM portal_app WHERE id = #{appId}
+    </delete>
+</mapper>
+
